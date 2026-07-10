@@ -32,9 +32,11 @@
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
+#include "core/error/error_macros.h"
 #include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "core/object/object.h"
 #include "core/object/script_language.h"
 #include "editor/animation/animation_player_editor_plugin.h"
 #include "editor/docks/editor_dock_manager.h"
@@ -56,6 +58,7 @@
 #include "scene/gui/flow_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/texture_rect.h"
+#include "scene/gui/tree.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
 #include "scene/resources/packed_scene.h"
@@ -2120,6 +2123,15 @@ bool SceneTreeEditor::can_drop_data_fw(const Point2 &p_point, const Variant &p_d
 		return _has_drop_selection(item, p_point);
 	}
 
+	if (String(d["type"]) == "signal") {
+		NodePath np = item->get_metadata(0);
+		Node *n = get_node(np);
+		if (n && !n->get_script().is_null()) {
+			tree->set_drop_mode_flags(Tree::DROP_MODE_ON_ITEM);
+			return _has_drop_selection(item, p_point);
+		}
+	}
+
 	return false;
 }
 
@@ -2168,6 +2180,13 @@ void SceneTreeEditor::drop_data_fw(const Point2 &p_point, const Variant &p_data,
 			if (_is_script_type(EditorFileSystem::get_singleton()->get_file_type(sp))) {
 				emit_signal(SNAME("script_dropped"), sp, np);
 			}
+		}
+	}
+
+	if (String(d["type"]) == "signal") {
+		TreeItem *signal_item = Object::cast_to<TreeItem>(d["tree_item"]);
+		if (signal_item) {
+			SignalsDock::get_singleton()->open_connection_dialog(*signal_item, n);
 		}
 	}
 }

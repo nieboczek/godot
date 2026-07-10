@@ -32,6 +32,7 @@
 
 #include "editor/docks/editor_dock.h"
 
+class TreeItem;
 class ConnectionsDock;
 
 class SignalsDock : public EditorDock {
@@ -45,7 +46,7 @@ public:
 	static SignalsDock *get_singleton() { return singleton; }
 
 	void set_object(Object *p_object);
-
+	void open_connection_dialog(TreeItem &p_item, Node *preferred_dst = nullptr);
 	void update_lists();
 
 	SignalsDock();

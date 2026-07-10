@@ -37,6 +37,10 @@ void SignalsDock::update_lists() {
 	connections->update_tree();
 }
 
+void SignalsDock::open_connection_dialog(TreeItem &p_item, Node *preferred_dst) {
+	connections->open_connection_dialog(p_item, preferred_dst);
+}
+
 void SignalsDock::set_object(Object *p_object) {
 	connections->set_object(p_object);
 }

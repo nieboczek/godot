@@ -31,9 +31,11 @@
 #include "connections_dialog.h"
 
 #include "core/config/project_settings.h"
+#include "core/error/error_macros.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/templates/hash_set.h"
+#include "core/variant/dictionary.h"
 #include "editor/doc/editor_help.h"
 #include "editor/docks/scene_tree_dock.h"
 #include "editor/docks/signals_dock.h"
@@ -1196,7 +1198,7 @@ void ConnectionsDock::_tree_item_activated() { // "Activation" on double-click.
 	}
 
 	if (_get_item_type(*item) == TREE_ITEM_TYPE_SIGNAL) {
-		_open_connection_dialog(*item);
+		open_connection_dialog(*item);
 	} else if (_get_item_type(*item) == TREE_ITEM_TYPE_CONNECTION) {
 		_go_to_method(*item);
 	}
@@ -1216,34 +1218,6 @@ ConnectionsDock::TreeItemType ConnectionsDock::_get_item_type(const TreeItem &p_
 
 bool ConnectionsDock::_is_connection_inherited(Connection &p_connection) {
 	return bool(p_connection.flags & CONNECT_INHERITED);
-}
-
-/*
- * Open connection dialog with TreeItem data to CREATE a brand-new connection.
- */
-void ConnectionsDock::_open_connection_dialog(TreeItem &p_item) {
-	if (is_editing_resource) {
-		return;
-	}
-
-	const Dictionary sinfo = p_item.get_metadata(0);
-	const StringName signal_name = sinfo["name"];
-	const PackedStringArray signal_args = sinfo["args"];
-
-	ConnectDialog::ConnectionData cd;
-
-	Node *selected_node = Object::cast_to<Node>(selected_object);
-	Node *dst_node = selected_node->get_owner() ? selected_node->get_owner() : selected_node;
-	if (!dst_node || dst_node->get_script().is_null()) {
-		dst_node = _find_first_script(get_tree()->get_edited_scene_root(), get_tree()->get_edited_scene_root());
-	}
-	cd.source = selected_object;
-	cd.target = dst_node;
-	cd.signal = signal_name;
-	cd.method = ConnectDialog::generate_method_callback_name(cd.source, signal_name, cd.target);
-	connect_dialog->init(cd, signal_args);
-	connect_dialog->set_title(TTR("Connect a Signal to a Method"));
-	connect_dialog->popup_dialog(signal_name.string() + "(" + String(", ").join(signal_args) + ")");
 }
 
 /*
@@ -1296,6 +1270,19 @@ void ConnectionsDock::_go_to_method(TreeItem &p_item) {
 	}
 }
 
+Variant ConnectionsDock::_get_drag_data_fw(const Point2 &p_point, Control *p_from) {
+	TreeItem *item = (p_point == Vector2(Math::INF, Math::INF)) ? tree->get_selected() : tree->get_item_at_position(p_point);
+	if (!item || _get_item_type(*item) != TREE_ITEM_TYPE_SIGNAL) {
+		return Variant();
+	}
+
+	Dictionary drag_data;
+	drag_data["type"] = "signal";
+	drag_data["tree_item"] = item;
+
+	return drag_data;
+}
+
 void ConnectionsDock::_handle_class_menu_option(int p_option) {
 	switch (p_option) {
 		case CLASS_MENU_OPEN_DOCS:
@@ -1319,7 +1306,7 @@ void ConnectionsDock::_handle_signal_menu_option(int p_option) {
 
 	switch (p_option) {
 		case SIGNAL_MENU_CONNECT: {
-			_open_connection_dialog(*item);
+			open_connection_dialog(*item);
 		} break;
 		case SIGNAL_MENU_DISCONNECT_ALL: {
 			disconnect_all_dialog->set_text(vformat(TTR("Are you sure you want to remove all connections from the \"%s\" signal?"), meta["name"]));
@@ -1477,7 +1464,7 @@ void ConnectionsDock::_connect_pressed() {
 	}
 
 	if (_get_item_type(*item) == TREE_ITEM_TYPE_SIGNAL) {
-		_open_connection_dialog(*item);
+		open_connection_dialog(*item);
 	} else if (_get_item_type(*item) == TREE_ITEM_TYPE_CONNECTION) {
 		Connection connection = item->get_metadata(0);
 		_disconnect(connection);
@@ -1516,6 +1503,37 @@ void ConnectionsDock::_notification(int p_what) {
 
 void ConnectionsDock::_bind_methods() {
 	ClassDB::bind_method("update_tree", &ConnectionsDock::update_tree);
+}
+
+/*
+ * Open connection dialog with TreeItem data to CREATE a brand-new connection.
+ */
+void ConnectionsDock::open_connection_dialog(TreeItem &p_item, Node *p_preferred_dst) {
+	if (is_editing_resource) {
+		return;
+	}
+
+	const Dictionary sinfo = p_item.get_metadata(0);
+	const StringName signal_name = sinfo["name"];
+	const PackedStringArray signal_args = sinfo["args"];
+
+	ConnectDialog::ConnectionData cd;
+
+	Node *selected_node = Object::cast_to<Node>(selected_object);
+	Node *dst_node = p_preferred_dst;
+	if (!dst_node) {
+		dst_node = selected_node->get_owner() ? selected_node->get_owner() : selected_node;
+	}
+	if (!dst_node || dst_node->get_script().is_null()) {
+		dst_node = _find_first_script(get_tree()->get_edited_scene_root(), get_tree()->get_edited_scene_root());
+	}
+	cd.source = selected_object;
+	cd.target = dst_node;
+	cd.signal = signal_name;
+	cd.method = ConnectDialog::generate_method_callback_name(cd.source, signal_name, cd.target);
+	connect_dialog->init(cd, signal_args);
+	connect_dialog->set_title(TTR("Connect a Signal to a Method"));
+	connect_dialog->popup_dialog(signal_name.string() + "(" + String(", ").join(signal_args) + ")");
 }
 
 void ConnectionsDock::set_object(Object *p_object) {
@@ -1772,6 +1790,7 @@ ConnectionsDock::ConnectionsDock() {
 	tree->set_column_clip_content(0, true);
 	tree->set_scroll_hint_mode(Tree::SCROLL_HINT_MODE_BOTH);
 	mc->add_child(tree);
+	SET_DRAG_FORWARDING_GCDU(tree, ConnectionsDock);
 
 	connect_button = memnew(Button);
 	connect_button->set_accessibility_name(TTRC("Connect"));

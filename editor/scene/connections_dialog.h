@@ -31,6 +31,8 @@
 #pragma once
 
 #include "core/variant/callable_bind.h"
+#include "core/variant/dictionary.h"
+#include "core/variant/variant.h"
 #include "scene/gui/dialogs.h"
 #include "scene/gui/tree.h"
 
@@ -261,9 +263,12 @@ class ConnectionsDock : public VBoxContainer {
 	TreeItemType _get_item_type(const TreeItem &p_item) const;
 	bool _is_connection_inherited(Connection &p_connection);
 
-	void _open_connection_dialog(TreeItem &p_item);
 	void _open_edit_connection_dialog(TreeItem &p_item);
 	void _go_to_method(TreeItem &p_item);
+
+	Variant _get_drag_data_fw(const Point2 &p_point, Control *p_from);
+	bool _can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const { return false; }
+	void _drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) {}
 
 	void _handle_class_menu_option(int p_option);
 	void _class_menu_about_to_popup();
@@ -280,6 +285,7 @@ protected:
 	static void _bind_methods();
 
 public:
+	void open_connection_dialog(TreeItem &p_item, Node *p_preferred_dst = nullptr);
 	void set_object(Object *p_object);
 	void update_tree();
 
